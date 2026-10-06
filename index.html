@@ -1,1 +1,282 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hái Trộm Trái Cây Tuổi Thơ 🥭🐕</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            background: #1b2e1b;
+            color: #ffffff;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            text-align: center;
+            margin: 0;
+            padding: 15px;
+        }
+        h1 { margin: 5px 0; font-size: 26px; color: #ffca28; text-shadow: 2px 2px #000; }
+        p { margin: 5px 0 15px 0; color: #ddd; font-size: 14px; }
+        #game-container {
+            position: relative;
+            display: inline-block;
+            max-width: 100%;
+        }
+        canvas {
+            background: #2e4d2e;
+            border: 4px solid #8d5b4c;
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+            display: block;
+            margin: 0 auto;
+        }
+        .instructions {
+            background: #263a26;
+            border: 1px solid #4d7a4d;
+            border-radius: 8px;
+            padding: 12px;
+            max-width: 600px;
+            margin: 15px auto 0;
+            text-align: left;
+            font-size: 13px;
+            line-height: 1.6;
+            color: #e0e0e0;
+        }
+        .instructions b { color: #ffca28; }
+    </style>
+</head>
+<body>
 
+    <h1>🥭 HÁI TRỘM TRÁI CÂY TUỔI THƠ 🐕</h1>
+    <p>Cẩn thận kẻo Bà Tám và Cậu Mực phát hiện!</p>
+
+    <div id="game-container">
+        <canvas id="gameCanvas" width="600" height="450"></canvas>
+    </div>
+
+    <div class="instructions">
+        <b>📜 QUY TẮC CHƠI:</b><br>
+        • <b>Khi Hái Quả:</b> Bấm đúng các phím Mũi Tên (⬆️ ⬇️ ⬅️ ➡️) hiển thị trên màn hình trước khi hết giờ để hái được 1 quả trái cây.<br>
+        • <b>Thanh Nộ:</b> Khi bạn trèo cây quá lâu, bấm sai phím hoặc để hết giờ, Bà Tám và Con Mực sẽ chú ý làm Thanh Nộ tăng lên.<br>
+        • <b>Khi Thanh Nộ Đầy (CHẠY TRỐN!):</b> Nhanh tay bấm chính xác phím ⬅️ TRÁI hoặc ➡️ PHẢI theo chỉ dẫn để vắt chân lên cổ chạy thoát!<br>
+        • <b>Cảnh báo:</b> Bấm sai hoặc chậm chân khi chạy trốn, bạn sẽ bị Bà Tám tóm gọn!
+    </div>
+
+    <script>
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
+
+        // Ngăn trình duyệt cuộn trang khi bấm phím mũi tên
+        window.addEventListener("keydown", function(e) {
+            if(["Space","ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].indexOf(e.code) > -1) {
+                e.preventDefault();
+            }
+        }, false);
+
+        // Biến trạng thái Game
+        let state = 'MENU'; // MENU, PICKING, ESCAPING, GAME_OVER, VICTORY
+let difficulty = 'easy';
+        let fruits = 0;
+        let rage = 0; // 0 - 100
+        
+        let currentArrow = 'ArrowUp';
+        let arrowTimer = 0;
+        let arrowTimerMax = 100;
+
+        let escapeStep = 0;
+        let totalEscapeSteps = 6;
+        let escapeArrow = 'ArrowLeft';
+        let escapeTimer = 0;
+        let escapeTimerMax = 60;
+
+        let messageText = "";
+
+        const ARROWS = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
+        const ARROW_ICONS = {
+            'ArrowUp': '⬆️ TRÊN',
+            'ArrowDown': '⬇️ DƯỚI',
+            'ArrowLeft': '⬅️ TRÁI',
+            'ArrowRight': '➡️ PHẢI'
+        };
+
+        const DIFF_CONFIG = {
+            easy: { name: "DỄ (Vườn Chú Bảy)", rageSpeed: 0.08, timerMax: 110, escapeSteps: 5, penalty: 18 },
+            medium: { name: "KHÓ (Vườn Bà Tám)", rageSpeed: 0.16, timerMax: 75, escapeSteps: 8, penalty: 25 },
+            hard: { name: "RẤT KHÓ (Bà Tám + Chó Mực)", rageSpeed: 0.28, timerMax: 45, escapeSteps: 12, penalty: 35 }
+        };
+
+        function setDifficulty(diff) {
+            difficulty = diff;
+            startGame();
+        }
+
+        function startGame() {
+            fruits = 0;
+            rage = 0;
+            state = 'PICKING';
+            nextPickingArrow();
+        }
+
+        function nextPickingArrow() {
+            currentArrow = ARROWS[Math.floor(Math.random() * ARROWS.length)];
+            arrowTimerMax = DIFF_CONFIG[difficulty].timerMax;
+            arrowTimer = arrowTimerMax;
+        }
+
+        function startEscapePhase() {
+            state = 'ESCAPING';
+            escapeStep = 0;
+            totalEscapeSteps = DIFF_CONFIG[difficulty].escapeSteps;
+            nextEscapeArrow();
+        }
+
+        function nextEscapeArrow() {
+            escapeArrow = Math.random() < 0.5 ? 'ArrowLeft' : 'ArrowRight';
+            escapeTimerMax = DIFF_CONFIG[difficulty].timerMax + 10;
+            escapeTimer = escapeTimerMax;
+        }
+
+        // Bắt sự kiện bấm phím
+        document.addEventListener('keydown', (e) => {
+            if (state === 'MENU') {
+                if (e.key === '1') setDifficulty('easy');
+                if (e.key === '2') setDifficulty('medium');
+                if (e.key === '3') setDifficulty('hard');
+                return;
+            }
+
+            if (state === 'GAME_OVER' || state === 'VICTORY') {
+                if (e.key === ' ' || e.key === 'Enter') {
+                    state = 'MENU';
+                }
+                return;
+            }
+
+            if (state === 'PICKING') {
+                if (ARROWS.includes(e.key)) {
+                    if (e.key === currentArrow) {
+                        fruits++;
+                        rage = Math.max(0, rage - 2); // Thưởng giảm nhẹ nộ khi bấm chuẩn
+                        nextPickingArrow();
+                    } else {
+                        // Bấm sai -> Tăng nộ
+rage += DIFF_CONFIG[difficulty].penalty;
+                        nextPickingArrow();
+                    }
+                }
+            } else if (state === 'ESCAPING') {
+                if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+                    if (e.key === escapeArrow) {
+                        escapeStep++;
+                        if (escapeStep >= totalEscapeSteps) {
+                            state = 'VICTORY';
+                        } else {
+                            nextEscapeArrow();
+                        }
+                    } else {
+                        // Bấm sai phím khi chạy -> Bị bắt!
+                        state = 'GAME_OVER';
+                        messageText = "Bạn bấm lộn đường chạy nên đã bị Bà Tám tóm gọn!";
+                    }
+                }
+            }
+        });
+
+        // Click chuột hỗ trợ cho MENU
+        canvas.addEventListener('click', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+
+            if (state === 'MENU') {
+                if (x >= 180 && x <= 420) {
+                    if (y >= 170 && y <= 210) setDifficulty('easy');
+                    if (y >= 230 && y <= 270) setDifficulty('medium');
+                    if (y >= 290 && y <= 330) setDifficulty('hard');
+                }
+            } else if (state === 'GAME_OVER' || state === 'VICTORY') {
+                if (y >= 350 && y <= 400) state = 'MENU';
+            }
+        });
+
+        function update() {
+            if (state === 'PICKING') {
+                // Nộ tự tích lũy theo thời gian
+                rage += DIFF_CONFIG[difficulty].rageSpeed;
+                
+                arrowTimer--;
+                if (arrowTimer <= 0) {
+                    // Hết giờ bấm phím -> Tăng nộ
+                    rage += DIFF_CONFIG[difficulty].penalty;
+                    nextPickingArrow();
+                }
+
+                if (rage >= 100) {
+                    rage = 100;
+                    startEscapePhase();
+                }
+            } else if (state === 'ESCAPING') {
+                escapeTimer--;
+                if (escapeTimer <= 0) {
+                    // Chạy quá chậm -> Bị bắt
+                    state = 'GAME_OVER';
+                    messageText = "Bạn chạy quá chậm nên Cậu Mực đã rượt kịp!";
+                }
+            }
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            if (state === 'MENU') {
+                drawMenu();
+            } else if (state === 'PICKING') {
+                drawPickingScreen();
+            } else if (state === 'ESCAPING') {
+                drawEscapeScreen();
+            } else if (state === 'GAME_OVER') {
+                drawGameOverScreen();
+            } else if (state === 'VICTORY') {
+drawVictoryScreen();
+            }
+        }
+
+        // --- CÁC MÀN HÌNH GAME ---
+
+        function drawMenu() {
+            ctx.fillStyle = "#ffca28";
+            ctx.font = "bold 26px Arial";
+            ctx.fillText("CHỌN CẤP ĐỘ HÁI TRỘM", 140, 100);
+
+            drawButton(180, 170, 240, 40, "1. DỄ (Vườn Chú Bảy)", "#4caf50");
+            drawButton(180, 230, 240, 40, "2. KHÓ (Vườn Bà Tám)", "#ff9800");
+            drawButton(180, 290, 240, 40, "3. RẤT KHÓ (+ Chó Mực)", "#f44336");
+
+            ctx.fillStyle = "#cccccc";
+            ctx.font = "14px Arial";
+            ctx.fillText("Bấm phím 1, 2, 3 hoặc click chuột để chọn!", 170, 380);
+        }
+
+        function drawButton(x, y, w, h, text, color) {
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.roundRect(x, y, w, h, 8);
+            ctx.fill();
+            ctx.fillStyle = "#ffffff";
+            ctx.font = "bold 15px Arial";
+            ctx.fillText(text, x + 20, y + 25);
+        }
+
+        function drawPickingScreen() {
+            // Khung cảnh vườn cây
+            drawBackground();
+
+            // Vẽ Cây xoài & Cậu bé
+            ctx.font = "70px Arial";
+            ctx.fillText("🌳", 420, 280);
+            ctx.font = "30px Arial";
+            ctx.fillText("🥭", 430, 200);
+            ctx.fillText("🥭", 470, 220);
+            ctx.fillText("🧗", 450, 260); // Cậu bé trèo cây
+
+            // Vẽ Bà Tám & Chó Mực
+            if (rage <
